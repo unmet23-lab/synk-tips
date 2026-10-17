@@ -3,7 +3,7 @@ title: I switched accounts and all my Claude sessions vanished
 date: 2026-10-17
 level: intermediate
 topic: claude-app
-tools: Claude desktop app (Windows), Node.js, PowerShell 7
+tools: Claude desktop app (Windows), Node.js, PowerShell
 summary: Logging in with another account left the Code tab's session list empty. The conversations were not gone. Only the list lives in a different folder per account.
 start: 3
 ---
@@ -43,25 +43,25 @@ My first attempt joined the folders with a junction (a linked folder). That fail
 1. Keeps every pair folder (account × organization) as a **real folder**.
 2. When a session record is added, changed or deleted in any one folder, it copies that change to all the others within one or two seconds. If the same file differs between folders, the most recently modified one wins. Deleted sessions (a `deleted_*` marker) are never resurrected.
 3. When the app logs in with a pair it has never seen and reads zero sessions, the script fills that folder and shows a Windows notification saying "restart the app". That one restart is the only one you need.
-4. Backs up the folder with the most records every hour.
+4. Backs up every account folder in full at install time, and after that backs up the folder with the most records every hour.
 
-The install steps are written out in [Installing the session-share tool](/en/claude-session-share-install/). It is one Node.js script plus a Startup-folder entry.
+I turned the script into a tool you install with one PowerShell line. The steps are in [Installing the session-share tool](/en/claude-session-share-install/).
 
 ## Check again
 
 Look at the script's status.
 
 ```powershell
-node "$env:USERPROFILE\.ai-accounts\claude-session-share.mjs" --status
+node "$env:LOCALAPPDATA\claude-session-share\claude-session-share.mjs" --status
 ```
 
-Every pair folder should show the same "N session records" count and no "(not synced yet)" marks.
+Each account folder shows a session-record count. If every line has the same number, you are done.
 
 Then log in with another account and look at the sidebar. If it is an account you have never used, a notification appears; restart the app once. Same list — done.
 
 ## Pitfalls
 
-- **Do not join the folders with a junction or symlink.** The app checks the session folder with `lstat` and `realpath`, and refuses to write if it is a reparse point. `main.log` (in the app data folder's `logs\`) filled up with over a thousand lines of "Failed to save session … Refusing non-directory at private dir path (symlink/file plant)". Reads look fine for a while and then suddenly return zero. Twenty-one sessions I created over two hours this way were never saved, and I had to rebuild their records from the transcripts.
+- **Do not join the folders with a junction or symlink.** The app checks the session folder with `lstat` and `realpath`, and refuses to write if it is a reparse point. `main.log` (in `%LOCALAPPDATA%\Claude\logs\`) filled up with over a thousand lines of "Failed to save session … Refusing non-directory at private dir path (symlink/file plant)". Reads look fine for a while and then suddenly return zero. Twenty-one sessions I created over two hours this way were never saved, and I had to rebuild their records from the transcripts.
 - The app does not watch the folder. Even after the files are in place, the list only changes after you restart the app.
 - If the list looks empty, search `main.log` for "Refusing" and "Loaded 0 persisted sessions". The first means a linked-folder problem; the second means a pair the app has not seen before.
 - Sharing is only between Claude app logins. If another AI tool is showing your Claude conversations, that is that tool's own "import" setting, not this script.

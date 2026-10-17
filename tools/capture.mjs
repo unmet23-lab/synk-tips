@@ -17,8 +17,12 @@ const PORT = 9333;
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', `--remote-debugging-port=${PORT}`, `--user-data-dir=${path.join(out, '.profile')}`, 'about:blank'], { stdio: 'ignore' });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function browserWs() {
-  for (let i = 0; i < 60; i++) { try { const r = await fetch(`http://127.0.0.1:${PORT}/json/version`); if (r.ok) return (await r.json()).webSocketDebuggerUrl; } catch {} await sleep(250); }
+// 브라우저 수준 Target.createTarget 이 「Not supported」로 막히는 판이 있어, 처음 열린 페이지(about:blank) 하나에 붙어 차례로 찍는다.
+async function pageWs() {
+  for (let i = 0; i < 60; i++) {
+    try { const r = await fetch(`http://127.0.0.1:${PORT}/json/list`); if (r.ok) { const page = (await r.json()).find((t) => t.type === 'page'); if (page) return page.webSocketDebuggerUrl; } } catch {}
+    await sleep(250);
+  }
   throw new Error('Chrome 디버그 포트가 안 열린다');
 }
 
@@ -32,29 +36,26 @@ class CDP {
 }
 
 async function shot(c, name, url, { width, height = 900, dpr = 1, mobile = false }) {
-  const { targetId } = await c.send('Target.createTarget', { url: 'about:blank' });
-  const { sessionId: s } = await c.send('Target.attachToTarget', { targetId, flatten: true });
-  await c.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile }, s);
-  await c.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] }, s);
-  await c.send('Page.enable', {}, s);
+  await c.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile });
+  await c.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
+  await c.send('Page.enable');
   c.events.length = 0;
-  await c.send('Page.navigate', { url }, s);
-  for (let i = 0; i < 50; i++) { if (c.events.some((e) => e.method === 'Page.loadEventFired' && e.sessionId === s)) break; await sleep(100); }
-  await c.send('Runtime.evaluate', { expression: 'document.fonts.ready', awaitPromise: true }, s);
+  await c.send('Page.navigate', { url });
+  for (let i = 0; i < 50; i++) { if (c.events.some((e) => e.method === 'Page.loadEventFired')) break; await sleep(100); }
+  await c.send('Runtime.evaluate', { expression: 'document.fonts.ready', awaitPromise: true });
   await sleep(300);
-  const { result } = await c.send('Runtime.evaluate', { expression: 'JSON.stringify({h:document.documentElement.scrollHeight,sw:document.documentElement.scrollWidth,w:innerWidth})', returnByValue: true }, s);
+  const { result } = await c.send('Runtime.evaluate', { expression: 'JSON.stringify({h:document.documentElement.scrollHeight,sw:document.documentElement.scrollWidth,w:innerWidth})', returnByValue: true });
   const m = JSON.parse(result.value);
-  await c.send('Emulation.setDeviceMetricsOverride', { width, height: Math.min(m.h, 6000), deviceScaleFactor: dpr, mobile }, s);
+  await c.send('Emulation.setDeviceMetricsOverride', { width, height: Math.min(m.h, 6000), deviceScaleFactor: dpr, mobile });
   await sleep(150);
-  const { data } = await c.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, s);
+  const { data } = await c.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
   fs.writeFileSync(path.join(out, `${name}.png`), Buffer.from(data, 'base64'));
   console.log(`${name}.png  ${width}×${m.h}  ${m.sw > m.w ? '⚠ 가로 넘침 ' + m.sw + '>' + m.w : '넘침 없음'}`);
-  await c.send('Target.closeTarget', { targetId }).catch(() => {});
 }
 
 const pages = JSON.parse(fs.readFileSync(path.resolve('dist/ko/search.json'), 'utf8')).map((p) => p.u);
 try {
-  const c = await CDP.open(await browserWs());
+  const c = await CDP.open(await pageWs());
   for (const lang of ['ko', 'en']) {
     await shot(c, `phone-${lang}-home`, `${base}/${lang}/`, { width: 390, dpr: 2, mobile: true });
     await shot(c, `desktop-${lang}-home`, `${base}/${lang}/`, { width: 1440 });

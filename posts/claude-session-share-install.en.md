@@ -36,10 +36,10 @@ winget install OpenJS.NodeJS.LTS
 
 ### 3. The one-line install
 
-Public repository: **(coming soon — the link and the blank in the command below will be filled in once it is decided)**
+Public repository: [unmet23-lab/claude-session-share](https://github.com/unmet23-lab/claude-session-share)
 
 ```powershell
-irm https://raw.githubusercontent.com/<repo owner>/claude-session-share/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/unmet23-lab/claude-session-share/main/install.ps1 | iex
 ```
 
 The installer does five things: checks Node.js, puts the script in `%LOCALAPPDATA%\claude-session-share\`, creates `claude-session-share.vbs` in the Startup folder, backs up every account folder in full and syncs them once, then starts the watcher and prints the status. Running the same line again updates the tool.

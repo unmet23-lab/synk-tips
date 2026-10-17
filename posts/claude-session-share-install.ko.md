@@ -36,10 +36,10 @@ winget install OpenJS.NodeJS.LTS
 
 ### 3. 설치 한 줄
 
-공개 저장소: **(준비 중 — 주소가 정해지면 여기와 아래 명령의 빈칸을 채웁니다)**
+공개 저장소: [unmet23-lab/claude-session-share](https://github.com/unmet23-lab/claude-session-share)
 
 ```powershell
-irm https://raw.githubusercontent.com/<저장소 주인>/claude-session-share/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/unmet23-lab/claude-session-share/main/install.ps1 | iex
 ```
 
 설치기가 하는 일은 다섯 가지다. Node.js 확인, 스크립트를 `%LOCALAPPDATA%\claude-session-share\`에 두기, 시작프로그램에 `claude-session-share.vbs` 만들기, 모든 계정 폴더를 통째로 백업하고 한 번 맞추기, 지켜보기 시작하고 상태 보여 주기. 같은 한 줄을 다시 실행하면 업데이트된다.

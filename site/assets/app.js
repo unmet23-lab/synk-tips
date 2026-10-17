@@ -3,15 +3,21 @@
   'use strict';
 
   /* ---------- 코드 복사 ---------- */
-  function copyText(text) {
-    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  function legacyCopy(text) {
     return new Promise(function (resolve, reject) {
       var ta = document.createElement('textarea');
       ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy') ? resolve() : reject(new Error('copy failed')); } catch (e) { reject(e); }
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('copy failed'));
     });
+  }
+  function copyText(text) {
+    // 새 API 가 막히면(권한·비보안 주소·내장 브라우저) 옛 방식으로 한 번 더
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).catch(function () { return legacyCopy(text); });
+    return legacyCopy(text);
   }
   document.querySelectorAll('[data-copy]').forEach(function (btn) {
     var label = btn.textContent;

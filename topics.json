@@ -1,0 +1,8 @@
+{
+  "claude-app": { "ko": "Claude 앱", "en": "Claude app" },
+  "git": { "ko": "git", "en": "git" },
+  "windows": { "ko": "윈도우", "en": "Windows" },
+  "node": { "ko": "Node.js", "en": "Node.js" },
+  "video": { "ko": "영상 도구", "en": "Video tools" },
+  "deploy": { "ko": "배포", "en": "Deploy" }
+}

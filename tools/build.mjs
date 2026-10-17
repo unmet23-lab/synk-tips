@@ -174,6 +174,9 @@ function loadPosts() {
   return posts;
 }
 
+/* 글 정렬: 날짜 내림차순, 같은 날짜는 slug 바이트 순 — 로캘·OS 와 무관하게 같은 결과 */
+const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+
 /* ---------- 조각(HTML 부품) ---------- */
 const levelBadge = (lang, level) => `<span class="lv lv-${level}" title="${attr(T[lang].levelLegend[level])}"><i aria-hidden="true"></i>${esc(LEVELS[level][lang])}</span>`;
 const topicChip = (lang, topic, rel) => `<a class="chip" href="${attr(rel + lang + '/topic/' + topic + '/')}">${esc(TOPICS[topic][lang] || topic)}</a>`;
@@ -255,7 +258,7 @@ function homePage(lang, posts, rel, assetVer) {
   const t = T[lang];
   const mine = posts.filter((p) => p.lang === lang);
   const startPath = mine.filter((p) => p.start > 0).sort((a, b) => a.start - b.start);
-  const recent = [...mine].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.title.localeCompare(b.title)));
+  const recent = [...mine].sort(byDateDesc);
   const topicCounts = Object.keys(TOPICS).map((k) => ({ k, n: mine.filter((p) => p.topic === k).length })).filter((x) => x.n > 0);
   const body = `
 <section class="hero wrap">
@@ -282,7 +285,7 @@ ${startPath.length ? `<section class="section wrap" id="start" aria-labelledby="
 
 function topicPage(lang, topic, posts, rel, assetVer) {
   const t = T[lang];
-  const mine = posts.filter((p) => p.lang === lang && p.topic === topic).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const mine = posts.filter((p) => p.lang === lang && p.topic === topic).sort(byDateDesc);
   const name = TOPICS[topic][lang];
   const body = `
 <section class="hero hero-small wrap">
@@ -297,7 +300,7 @@ function topicPage(lang, topic, posts, rel, assetVer) {
 function postPage(p, posts, rel, assetVer) {
   const lang = p.lang, t = T[lang];
   const { html, toc } = renderMarkdown(p.body, rel, lang);
-  const same = posts.filter((x) => x.lang === lang && x.topic === p.topic && x.slug !== p.slug).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 4);
+  const same = posts.filter((x) => x.lang === lang && x.topic === p.topic && x.slug !== p.slug).sort(byDateDesc).slice(0, 4);
   const alternates = { [lang]: `${lang}/${p.slug}/` };
   for (const l of p.alt) alternates[l] = `${l}/${p.slug}/`;
   const body = `
@@ -347,7 +350,7 @@ function notFoundPage(assetVer) {
 
 function rss(lang, posts) {
   const t = T[lang];
-  const items = posts.filter((p) => p.lang === lang).sort((a, b) => (a.date < b.date ? 1 : -1)).map((p) => {
+  const items = posts.filter((p) => p.lang === lang).sort(byDateDesc).map((p) => {
     const url = `${SITE_URL}/${lang}/${p.slug}/`;
     const pub = new Date(`${p.date}T09:00:00+09:00`).toUTCString();
     return `<item><title>${esc(p.title)}</title><link>${url}</link><guid isPermaLink="true">${url}</guid><pubDate>${pub}</pubDate><description>${esc(p.summary)}</description><category>${esc(TOPICS[p.topic][lang])}</category><category>${esc(LEVELS[p.level][lang])}</category></item>`;

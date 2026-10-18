@@ -5,7 +5,6 @@ level: 초급
 topic: claude-app
 tools: Windows 11, PowerShell, Node.js 20 이상, Claude 데스크톱 앱
 summary: 계정을 바꿔도 Code 탭 세션 목록이 그대로 보이게 하는 도구를 깐다. PowerShell 한 줄로 설치하고, Claude를 한 번 껐다 켜면 끝.
-start: 2
 ---
 
 ## 증상

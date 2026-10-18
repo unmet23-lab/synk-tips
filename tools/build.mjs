@@ -20,6 +20,9 @@ const SITE = path.join(ROOT, 'site');
 const DIST = path.join(ROOT, 'dist');
 const SITE_URL = (process.env.SITE_URL || 'https://tips.synk.im').replace(/\/$/, '');
 const REPO_URL = process.env.REPO_URL || readJson(path.join(ROOT, 'site.json')).repo || '';
+// Cloudflare Web Analytics(쿠키 없음, 무료). 번호는 모든 페이지에 실리는 공개 값이다. 빈칸이면 넣지 않는다.
+const CF_BEACON = process.env.CF_BEACON ?? readJson(path.join(ROOT, 'site.json')).cfBeacon ?? '';
+const beaconTag = () => (CF_BEACON ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${CF_BEACON.replace(/[^a-f0-9]/gi, '')}"}'></script>\n` : '');
 const LANGS = ['ko', 'en'];
 const DEFAULT_LANG = 'ko';
 const TOPICS = readJson(path.join(ROOT, 'topics.json'));
@@ -45,6 +48,7 @@ const T = {
     channels: '채널', site: 'SYNK', edit: '이 글 고치기 제안', notFound: '그 주소에는 글이 없어요', notFoundLead: '주소가 바뀌었거나 아직 안 쓴 글입니다.',
     levelLegend: { beginner: '처음이어도 따라 할 수 있는 글', intermediate: '도구를 조금 써 본 사람', advanced: '원리까지 파는 글' },
     menu: '메뉴', skip: '본문으로 바로 가기', postsIn: (t) => `${t} 글`,
+    head: { answer: '바로 답', why: '왜 이런가', prevent: '다음부터 막기', takeaway: '가져갈 것', for: '이런 분께', read: '읽는 데', min: (n) => `${n}분`, level: '난이도' },
   },
   en: {
     name: 'SYNK Tips', tagline: 'Dev tips Yuho collected while building SYNK', by: 'by yuhobuilds',
@@ -59,6 +63,7 @@ const T = {
     channels: 'Channels', site: 'SYNK', edit: 'Suggest an edit', notFound: 'Nothing lives at that address', notFoundLead: 'The link may have changed, or the post is not written yet.',
     levelLegend: { beginner: 'Follow along on day one', intermediate: 'You have used the tool a bit', advanced: 'Digs into how it works' },
     menu: 'Menu', skip: 'Skip to content', postsIn: (t) => `Posts on ${t}`,
+    head: { answer: 'Quick answer', why: 'Why it happens', prevent: 'Stop it next time', takeaway: 'Take this with you', for: 'For', read: 'Reading time', min: (n) => `${n} min`, level: 'Level' },
   },
 };
 
@@ -91,8 +96,9 @@ function parseFrontMatter(raw, file) {
     const kv = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
     if (!kv) fail(`${file}: 앞머리 줄을 못 읽는다 → ${line}`);
     let v = kv[2].trim();
-    if (/^\[.*\]$/.test(v)) v = v.slice(1, -1).split(',').map((x) => x.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
-    else v = v.replace(/^["']|["']$/g, '');
+    // 목록은 tools 만. 머리 상자 칸(answer_code 등)에는 [Environment]::… 처럼 대괄호로 시작하는 명령이 들어간다.
+    if (kv[1] === 'tools' && /^\[.*\]$/.test(v)) v = v.slice(1, -1).split(',').map((x) => x.trim().replace(/^(["'])(.*)\1$/, '$2')).filter(Boolean);
+    else v = v.replace(/^(["'])(.*)\1$/, '$2'); // 양 끝이 같은 따옴표로 감싸였을 때만 벗긴다
     meta[kv[1]] = v;
   }
   return { meta, body: m[2] };
@@ -166,7 +172,11 @@ function loadPosts() {
     const tools = Array.isArray(meta.tools) ? meta.tools : String(meta.tools || '').split(',').map((x) => x.trim()).filter(Boolean);
     const start = meta.start ? Number(meta.start) : 0;
     if (!bySlug.has(slug)) bySlug.set(slug, {});
-    bySlug.get(slug)[lang] = { slug, lang, file, title: meta.title, date: meta.date, level, topic: meta.topic, tools, summary: meta.summary, start, body, draft: meta.draft === 'true' };
+    // 글 머리 틀(선택): hook · for · answer · answer_code · answer_lang · why · prevent · takeaway — 한 줄씩
+    const head = {};
+    for (const k of ['hook', 'for', 'answer', 'answer_code', 'answer_lang', 'why', 'prevent', 'takeaway']) if (meta[k]) head[k] = meta[k];
+    if (head.answer && !(head.why && head.prevent && head.takeaway)) fail(`${file}: answer 를 쓰면 why · prevent · takeaway 도 같이 쓴다`);
+    bySlug.get(slug)[lang] = { slug, lang, file, title: meta.title, date: meta.date, level, topic: meta.topic, tools, summary: meta.summary, start, body, head, draft: meta.draft === 'true' };
   }
   const posts = [];
   for (const [slug, langs] of bySlug) for (const lang of LANGS) if (langs[lang] && !langs[lang].draft) posts.push({ ...langs[lang], alt: LANGS.filter((l) => l !== lang && langs[l] && !langs[l].draft) });
@@ -248,6 +258,7 @@ ${body}
 <div class="wrap foot-bottom"><span>© 2026 SYNK · ${esc(t.by)}</span><span class="mono">tips.synk.im</span></div>
 </footer>
 <script src="${rel}assets/app.js?v=${assetVer.js}" defer></script>
+${beaconTag()}
 </body>
 </html>
 `;
@@ -308,7 +319,8 @@ function postPage(p, posts, rel, assetVer) {
 <header class="post-head">
 <p class="post-meta">${levelBadge(lang, p.level)}${topicChip(lang, p.topic, rel)}${timeTag(p.date)}</p>
 <h1 class="post-title">${esc(p.title)}</h1>
-<p class="lead post-sum">${esc(p.summary)}</p>
+<p class="lead post-sum">${p.head.hook ? inlineMd(p.head.hook) : esc(p.summary)}</p>
+${headBox(p, html)}
 <p class="byline"><span class="mono">${esc(t.by).toUpperCase()}</span>${CHANNELS.map((c) => `<a href="${attr(c.url)}" target="_blank" rel="noopener">${esc(c.label)}</a>`).join('<span class="sep" aria-hidden="true">·</span>')}</p>
 ${p.tools.length ? `<p class="tools"><span class="tools-label mono">${esc(t.tools).toUpperCase()}</span>${p.tools.map((x) => `<span class="chip chip-flat">${esc(x)}</span>`).join('')}</p>` : ''}
 ${toc.length ? `<nav class="toc" aria-label="${attr(t.toc)}"><span class="toc-label mono">${esc(t.toc).toUpperCase()}</span><ol>${toc.map((h) => `<li><a href="#${attr(h.id)}">${esc(h.text)}</a></li>`).join('')}</ol></nav>` : ''}
@@ -323,7 +335,39 @@ ${same.length ? `<section class="same" aria-labelledby="same-title"><h2 class="h
 </footer>
 </article>`;
   const page = layout({ lang, rel, title: p.title, description: p.summary, pathFromRoot: `${lang}/${p.slug}/`, alternates, body, assetVer, bodyClass: 'post-page', kind: 'post' });
-  return { page, text: stripHtml(html) };
+  const headText = ['hook', 'answer', 'answer_code', 'why', 'prevent', 'takeaway'].map((k) => p.head[k] || '').join(' ');
+  return { page, text: (headText + ' ' + stripHtml(html)).trim() };
+}
+
+/* 글 머리 상자: 바로 답 · 왜 · 다음부터 막기 · 가져갈 것 + 이런 분께 · 읽는 시간 · 난이도 */
+const inlineMd = (s) => new Marked({ gfm: true }).parseInline(String(s));
+function readMinutes(html) {
+  const text = stripHtml(html);
+  const hangul = (text.match(/[가-힣]/g) || []).length;
+  const words = text.replace(/[가-힣]/g, ' ').split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(hangul / 500 + words / 220)); // 한글 분당 500자, 영어 분당 220낱말 남짓
+}
+function headBox(p, html) {
+  const h = p.head;
+  if (!h.answer) return '';
+  const t = T[p.lang].head;
+  const code = h.answer_code
+    ? `<div class="code head-code"><div class="code-bar"><span class="code-lang">${esc(h.answer_lang || 'powershell')}</span><button class="copy" type="button" data-copy aria-label="${attr(T[p.lang].copy)}">${esc(T[p.lang].copy)}</button></div><pre><code>${esc(h.answer_code)}\n</code></pre></div>`
+    : '';
+  const row = (k, label) => `<div class="head-row head-${k}"><p class="head-k">${esc(label)}</p><p class="head-v">${inlineMd(h[k])}</p></div>`;
+  return `<section class="head-box" aria-label="${attr(t.answer)}">
+<div class="head-main">
+<div class="head-row head-answer"><p class="head-k">${esc(t.answer)}</p><p class="head-v">${inlineMd(h.answer)}</p>${code}</div>
+${row('why', t.why)}
+${row('prevent', t.prevent)}
+${row('takeaway', t.takeaway)}
+</div>
+<dl class="head-side">
+${h.for ? `<div><dt>${esc(t.for)}</dt><dd>${inlineMd(h.for)}</dd></div>` : ''}
+<div><dt>${esc(t.read)}</dt><dd>${esc(t.min(readMinutes(html)))}</dd></div>
+<div><dt>${esc(t.level)}</dt><dd>${levelBadge(p.lang, p.level)}</dd></div>
+</dl>
+</section>`;
 }
 
 function rootRedirect() {

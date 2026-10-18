@@ -5,7 +5,6 @@ level: 초급
 topic: windows
 tools: PowerShell 7
 summary: 큰따옴표 문자열에서 변수 바로 뒤에 한글을 붙이면 변수가 통째로 빈 값이 된다. 오류도 없다. $()나 ${}로 감싸면 된다.
-start: 1
 ---
 
 ## 증상

@@ -5,7 +5,6 @@ level: beginner
 topic: windows
 tools: PowerShell 7
 summary: Inside a double-quoted string, a Korean (or any Unicode) letter right after a variable swallows the whole variable into an empty value. No error. Wrap it in $() or ${}.
-start: 1
 ---
 
 ## Symptom

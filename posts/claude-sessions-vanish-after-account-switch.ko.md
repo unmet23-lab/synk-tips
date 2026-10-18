@@ -5,7 +5,6 @@ level: 중급
 topic: claude-app
 tools: Claude 데스크톱 앱(Windows), Node.js, PowerShell
 summary: 다른 계정으로 로그인했더니 Code 탭의 세션 목록이 텅 비었다. 대화는 안 사라졌다. 목록만 계정마다 다른 폴더에 있었다.
-start: 3
 ---
 
 ## 증상

@@ -180,6 +180,30 @@ a.chip:hover{border-color:var(--ink)}
 .toc a::before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em}
 .toc a:hover{border-color:var(--ink)}
 
+/* 글 머리 상자: 바로 답 · 왜 · 다음부터 막기 · 가져갈 것 | 이런 분께 · 읽는 데 · 난이도 */
+.head-box{margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) 210px;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:var(--paper)}
+.head-main{padding:20px 22px 22px;display:grid;gap:16px;min-width:0}
+.head-row{display:grid;gap:4px;min-width:0}
+.head-row p{margin:0}
+.head-code pre code{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all}
+.head-k{font-size:13.5px;font-weight:600;color:var(--shift-ink,#24448c);letter-spacing:-.005em}
+.head-v{font-size:16px;line-height:1.6}
+.head-v code{font-family:var(--mono);font-size:.9em;background:var(--stage);border:1px solid var(--line);border-radius:6px;padding:.05em .4em;overflow-wrap:anywhere}
+.head-answer .head-v{font-size:16.5px;font-weight:550}
+.head-code{margin-top:8px}
+.head-takeaway{padding-top:14px;border-top:1px solid var(--line)}
+.head-takeaway .head-v{font-weight:550}
+.head-side{margin:0;padding:20px 22px;background:var(--stage);display:grid;gap:14px;align-content:start}
+.head-side dt{font-size:13px;font-weight:550;color:var(--ink-3)}
+.head-side dd{margin:3px 0 0;font-size:14.5px;font-weight:600;line-height:1.45}
+@media (prefers-color-scheme:dark){.head-k{color:#c5d6f5}}
+@media (max-width:760px){
+  .head-box{grid-template-columns:minmax(0,1fr)}
+  .head-main{padding:16px 16px 18px;gap:14px}
+  .head-side{grid-template-columns:minmax(0,1fr) auto auto;gap:14px;padding:14px 16px}
+  .head-side dd{font-size:14px}
+}
+
 /* 본문 조판 */
 .prose{font-size:16px;line-height:1.7}
 .prose>*{margin:0}

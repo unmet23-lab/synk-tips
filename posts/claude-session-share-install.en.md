@@ -5,7 +5,6 @@ level: beginner
 topic: claude-app
 tools: Windows 11, PowerShell, Node.js 20+, Claude desktop app
 summary: Install the tool that keeps the Code tab's session list identical across accounts. One PowerShell line to install, one full restart of Claude. Done.
-start: 2
 ---
 
 ## Symptom

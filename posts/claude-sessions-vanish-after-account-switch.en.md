@@ -5,7 +5,6 @@ level: intermediate
 topic: claude-app
 tools: Claude desktop app (Windows), Node.js, PowerShell
 summary: Logging in with another account left the Code tab's session list empty. The conversations were not gone. Only the list lives in a different folder per account.
-start: 3
 ---
 
 ## Symptom

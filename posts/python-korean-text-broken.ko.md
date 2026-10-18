@@ -5,6 +5,7 @@ level: 초급
 topic: windows
 tools: Windows 11, Python 3, PowerShell
 summary: 파이썬 결과의 한글이 「ȫ���� 3��」처럼 깨지거나, UnicodeDecodeError·UnicodeEncodeError 'cp949' codec 오류로 멈춘다.
+short: 한글이 깨질 때
 start: 3
 hook: AI가 짜 준 파이썬을 돌렸더니 한글이 「ȫ���� 3��」처럼 나오거나 `'cp949' codec can't decode` 오류로 멈췄다면 이 글입니다.
 for: AI에게 파이썬 스크립트를 받아 윈도우에서 돌리는 분

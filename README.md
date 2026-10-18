@@ -26,6 +26,8 @@ topic: claude-app                # topics.json 의 키
 tools: Claude 데스크톱 앱(Windows), Node.js, PowerShell 7
 summary: 증상 한 줄 — 검색어가 되게 쓴다
 start: 3                         # (선택) 「처음이면 여기부터」 순서. 없으면 빠진다
+short: 세션이 사라졌다            # (선택) 짧은 이름 — 첫 화면 「많이 찾는 증상」 칩(그 말로 검색)과 글 왼쪽 길잡이에 쓴다. 그 말로 찾으면 이 글이 나와야 빌드가 통과한다
+featured: true                   # (선택) 첫 화면 오른쪽 대표 글. 없으면 가장 최근 글(같은 날이면 start 순서)
 # ↓ (선택) 글 머리 상자. answer 를 쓰면 why · prevent · takeaway 도 같이 쓴다. 모두 한 줄
 hook: 「이런 일을 겪었다면 이 글입니다」 한 줄 — 제목 아래에 요약 대신 나온다
 for: 이런 분께
@@ -38,7 +40,9 @@ takeaway: 다른 일에도 쓰이는 교훈 한 문장
 ---
 ```
 
-- 주제를 더하려면 `topics.json` 에 키와 ko·en 이름을 넣는다.
+- 카드·대표 글의 검은 표지 창은 「증상」 절의 첫 코드 블록에서 앞 몇 줄을 뽑는다. 증상 절에 블록이 없으면 글의 첫 코드 블록. 다른 블록을 쓰려면 그 블록을 ```` ```text cover ```` 처럼 `cover` 를 붙여 연다(본문에도 그대로 나온다).
+- `## 다시 확인` 절의 목록은 체크 표시로, `## 함정` 절의 목록은 호박색 칸으로 그려진다(절 이름이 글 틀과 같을 때).
+- 주제를 더하려면 `topics.json` 에 키와 ko·en 이름을 넣는다. 글이 없는 주제는 「준비 중」으로 보인다.
 - 그림은 `posts/img/` 에 두고 `![설명](/img/파일.png)` 로 부른다 (빌드가 상대 경로로 바꾼다).
 - 영어판이 아직 없으면 그 언어 쪽에는 글이 안 뜨고, 언어 전환은 첫 화면으로 간다.
 - `draft: true` 를 앞머리에 넣으면 빌드에서 빠진다.
@@ -48,10 +52,10 @@ takeaway: 다른 일에도 쓰이는 교훈 한 문장
 | 경로 | 하는 일 |
 |---|---|
 | `posts/` | 글 원고. `<slug>.ko.md` + `<slug>.en.md` 한 쌍 |
-| `tools/build.mjs` | 마크다운 → `dist/` (첫 화면·주제·글·검색 색인·RSS·sitemap). 의존은 `marked` 하나 |
+| `tools/build.mjs` | 마크다운 → `dist/` (첫 화면·주제·전체 글·글·검색 색인·RSS·sitemap). 의존은 `marked` 하나 |
 | `tools/check.mjs` | `dist/` 의 상대 링크가 다 실제 파일인지 확인 |
 | `tools/serve.mjs` | 로컬 미리 보기 서버 |
-| `site/assets/` | `style.css`(synk.im 공개본 값), `app.js`(복사·검색), 서체(woff2, OFL) |
+| `site/assets/` | `style.css`(synk.im 공개본 값 + SHIFT 파랑), `app.js`(복사·검색·증상 칩·차례 현재 위치), `img/`(유호 사진), 서체(woff2, OFL) |
 | `.github/workflows/pages.yml` | push 마다 빌드해 GitHub Pages 에 올림 |
 
 주소: 한국어 `/ko/…`, 영어 `/en/…`. 뿌리 `/` 는 `/ko/` 로 보낸다. 안쪽 링크는 전부 상대 경로라 사용자 지정 도메인과 `*.github.io/synk-tips/` 어느 쪽에서도 열린다.

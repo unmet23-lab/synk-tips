@@ -5,11 +5,18 @@ level: intermediate
 topic: claude-app
 tools: Claude desktop app (Windows), Node.js, PowerShell
 summary: Logging in with another account left the Code tab's session list empty. The conversations were not gone. Only the list lives in a different folder per account.
+short: Claude sessions vanished
 ---
 
 ## Symptom
 
 I work in the Code tab of the Claude desktop app all day. When I hit the usage limit I log in with another account and keep going. The moment I switched, the session list in the left sidebar was empty. Every session I had open looked like it was gone.
+
+```text cover
+Log in as A › Code tab sessions all there
+Log in as B › session list empty
+Back to A   › all there again
+```
 
 Switch back to the original account and they are all there again. So nothing was deleted. The app shows a different list per account. What I wanted was simple: "whichever account I log in with, the sessions I was working on should still be there."
 

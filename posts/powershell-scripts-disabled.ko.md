@@ -5,6 +5,7 @@ level: 초급
 topic: windows
 tools: Windows 11, Windows PowerShell, Node.js(npm)
 summary: npm, claude, codex, 파이썬 가상환경 명령이 「이 시스템에서 스크립트를 실행할 수 없으므로 … .ps1 파일을 로드할 수 없습니다」로 멈춘다.
+short: 스크립트를 실행할 수 없으므로
 start: 1
 hook: AI가 알려 준 대로 `npm install`이나 `claude`를 쳤는데 빨간 글씨로 「이 시스템에서 스크립트를 실행할 수 없으므로」가 떴다면 이 글입니다.
 for: 윈도우에서 AI 도구(Claude Code·Codex·npm·파이썬)를 처음 까는 분

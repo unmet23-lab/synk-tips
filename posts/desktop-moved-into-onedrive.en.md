@@ -5,6 +5,7 @@ level: beginner
 topic: windows
 tools: Windows 11, OneDrive, PowerShell
 summary: Something says it saved a file to the Desktop, but it is not there. OneDrive backup moved the Desktop folder into OneDrive, so different programs are looking at different "Desktops".
+short: File isn't on the Desktop
 start: 2
 hook: If your AI or a program said "saved to your Desktop" and the file is not on your screen's Desktop, or Desktop files will not open on your other devices, this post is for you.
 for: Anyone using Windows 11 with its default setup, anyone who has AI create files
@@ -18,6 +19,12 @@ takeaway: The path matters more than "saved". When you have AI create a file, as
 ## Symptom
 
 My AI told me it had saved the result to the Desktop. Nothing was on my screen's Desktop. I spent a good while wondering where it went.
+
+```text cover
+AI       › Saved the result to your Desktop
+Screen   › Nothing on the Desktop
+Explorer › Two folders called "Desktop"
+```
 
 A few related shapes:
 

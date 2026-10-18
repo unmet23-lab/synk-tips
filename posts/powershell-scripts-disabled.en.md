@@ -5,6 +5,7 @@ level: beginner
 topic: windows
 tools: Windows 11, Windows PowerShell, Node.js (npm)
 summary: npm, claude, codex or a Python venv command stops with "File …\npm.ps1 cannot be loaded because running scripts is disabled on this system."
+short: running scripts is disabled
 start: 1
 hook: If you typed `npm install` or `claude` the way your AI told you and got red text saying "running scripts is disabled on this system", this post is for you.
 for: Anyone installing AI tools (Claude Code, Codex, npm, Python) on Windows for the first time

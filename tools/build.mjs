@@ -2,7 +2,7 @@
 // tools/build.mjs — posts/*.md → dist/  (의존: marked 하나)
 //
 //   posts/<slug>.ko.md + posts/<slug>.en.md  →  dist/ko/<slug>/  dist/en/<slug>/
-//   첫 화면·주제 페이지·검색 색인(search.json)·RSS(feed.xml)·sitemap 을 같이 만든다.
+//   첫 화면·주제 페이지·전체 글·검색 색인(search.json)·RSS(feed.xml)·sitemap 을 같이 만든다.
 //   안쪽 링크는 전부 상대 경로라 tips.synk.im 에서도, GitHub Pages 기본 주소(/synk-tips/)에서도 열린다.
 //
 //   node tools/build.mjs            → dist/
@@ -26,6 +26,8 @@ const beaconTag = () => (CF_BEACON ? `<script defer src="https://static.cloudfla
 const LANGS = ['ko', 'en'];
 const DEFAULT_LANG = 'ko';
 const TOPICS = readJson(path.join(ROOT, 'topics.json'));
+const RESERVED_SLUGS = ['topic', 'posts', 'assets', 'img'];
+const PHOTO = 'assets/img/yuho-w320.webp';
 
 const LEVELS = {
   beginner: { ko: '초급', en: 'Beginner', order: 1 },
@@ -34,35 +36,55 @@ const LEVELS = {
 };
 const LEVEL_ALIAS = { '초급': 'beginner', '중급': 'intermediate', '고급': 'advanced', beginner: 'beginner', intermediate: 'intermediate', advanced: 'advanced' };
 
+// 글 틀의 절 이름 → 절 종류(다시 확인은 체크 목록, 함정은 호박색 칸으로 그린다)
+const SEC_KIND = { '증상': 'symptom', 'symptom': 'symptom', '원인·원리': 'cause', 'cause and principle': 'cause', '고침': 'fix', 'fix': 'fix', '다시 확인': 'check', 'check again': 'check', '함정': 'trap', 'pitfalls': 'trap' };
+const LANG_NAME = { powershell: 'PowerShell', ps1: 'PowerShell', pwsh: 'PowerShell', bash: 'Terminal', sh: 'Terminal', shell: 'Terminal', console: 'Terminal', python: 'Python', py: 'Python', json: 'JSON', js: 'JavaScript', javascript: 'JavaScript' };
+
 const T = {
   ko: {
-    name: 'SYNK Tips', tagline: '유호가 SYNK를 만들며 모은 개발 꿀팁', by: 'by yuhobuilds',
-    heroA: '유호가 SYNK를 만들며', heroB: '모은 개발 꿀팁',
-    heroLead: '막혔던 자리에서 바로 적습니다. 글마다 같은 틀입니다 — 증상 → 원인·원리 → 고침 → 다시 확인 → 함정. 초보도 따라 할 수 있게 복붙 명령과 원리를 같이 둡니다.',
-    start: '처음이면 여기부터', startLead: '순서대로 읽으면 됩니다. 하나 끝날 때마다 다음으로.',
-    recent: '최근 글', topics: '주제', topicLead: '도구별로 모았습니다. 난이도는 글마다 배지로 붙습니다.',
-    search: '검색', searchPlaceholder: '증상이나 도구 이름으로 찾기', searchHint: '예: 세션, PowerShell, 한글', noResults: '맞는 글이 없어요',
-    copy: '복사', copied: '복사됨', toc: '이 글의 차례', tools: '도구', level: '난이도', date: '쓴 날',
-    posts: (n) => `글 ${n}개`, otherLang: 'EN', thisLang: 'KR', otherLangTitle: 'English version',
-    sameTopic: '같은 주제의 다른 글', home: '첫 화면', feed: 'RSS', footerLine: '유호가 SYNK를 만들며 막힌 자리마다 적어 두는 개발 꿀팁입니다. 글은 마크다운 파일 하나로 올라갑니다.',
-    channels: '채널', site: 'SYNK', edit: '이 글 고치기 제안', notFound: '그 주소에는 글이 없어요', notFoundLead: '주소가 바뀌었거나 아직 안 쓴 글입니다.',
+    name: 'SYNK Tips', tagline: '유호가 SYNK를 만들며 모은 개발 꿀팁', by: 'by yuhobuilds', author: '유호',
+    nav: { start: '처음이면 여기부터', topics: '주제', latest: '최근 글' },
+    heroEyebrow: 'Tips · by yuhobuilds', heroA: '막혔던 자리에서', heroB: '바로 적은 개발 꿀팁',
+    heroLead: 'Claude 앱과 윈도우에서 AI 도구를 쓰다 막힌 순간을 그대로 적었습니다.',
+    heroLead2: '글마다 바로 답부터 드리고, 왜 그런지와 다음부터 막는 법을 같이 둡니다.',
+    findPlaceholder: '막힌 증상을 그대로 적어 보세요', findGo: '찾기', often: '많이 찾는 증상',
+    featured: '이번에 쓴 글', readGo: '읽기', coverSymptom: '막힌 화면',
+    startLead: '순서대로 읽으면 AI 도구를 처음 쓸 때 막히는 고비를 하나씩 넘습니다.', startTotal: (n) => `모두 읽는 데 약 ${n}분`,
+    topicsTitle: '주제로 찾기', soon: '준비 중', latestTitle: '최근 글', seeAll: '전체 보기',
+    allTitle: '모든 글', allLead: (n) => `지금까지 쓴 글 ${n}편입니다. 새 글부터 놓았습니다.`,
+    topicLead: (name, n) => `${name}에서 막힌 일 ${n}편입니다.`,
+    bylineTitle: '유호가 직접 막혀 보고 적습니다', bylineLead: '개발을 하나도 몰랐던 사람이 AI로 회사를 만들고 있습니다. 같은 이야기를 영상으로도 올려요.',
+    search: '검색', searchPlaceholder: '증상이나 도구 이름으로 찾기', noResults: '맞는 글이 없어요',
+    copy: '복사', toc: '이 글의 차례', mtoc: '차례', readTime: (n) => `읽는 데 ${n}분`,
+    next: { start: (i, n) => `처음이면 여기부터 · ${i} / ${n}`, topic: '같은 주제의 다른 글', latest: '최근 글' },
+    otherLang: 'EN', thisLang: 'KR', otherLangTitle: 'English version', home: '첫 화면', feed: 'RSS',
+    footerLine: '유호가 SYNK를 만들며 막힌 자리마다 적어 두는 개발 꿀팁입니다. 글은 마크다운 파일 하나로 올라갑니다.',
+    site: 'SYNK', edit: '글 고치기 제안', notFound: '그 주소에는 글이 없어요', notFoundLead: '주소가 바뀌었거나 아직 안 쓴 글입니다.',
     levelLegend: { beginner: '처음이어도 따라 할 수 있는 글', intermediate: '도구를 조금 써 본 사람', advanced: '원리까지 파는 글' },
-    menu: '메뉴', skip: '본문으로 바로 가기', postsIn: (t) => `${t} 글`,
+    menu: '메뉴', skip: '본문으로 바로 가기',
     head: { answer: '바로 답', why: '왜 이런가', prevent: '다음부터 막기', takeaway: '가져갈 것', for: '이런 분께', read: '읽는 데', min: (n) => `${n}분`, level: '난이도' },
   },
   en: {
-    name: 'SYNK Tips', tagline: 'Dev tips Yuho collected while building SYNK', by: 'by yuhobuilds',
-    heroA: 'Dev tips Yuho collected', heroB: 'while building SYNK',
-    heroLead: 'Written right where I got stuck. Every post follows the same shape — symptom → cause → fix → check again → pitfalls — with copy-paste commands and the reasoning behind them, so you can follow along even on day one.',
-    start: 'Start here', startLead: 'Read in order. Finish one, move to the next.',
-    recent: 'Latest', topics: 'Topics', topicLead: 'Grouped by tool. The difficulty is a badge on each post, not a menu.',
-    search: 'Search', searchPlaceholder: 'Search by symptom or tool', searchHint: 'e.g. session, PowerShell, Korean', noResults: 'No matching posts',
-    copy: 'Copy', copied: 'Copied', toc: 'On this page', tools: 'Tools', level: 'Level', date: 'Written',
-    posts: (n) => `${n} post${n === 1 ? '' : 's'}`, otherLang: 'KR', thisLang: 'EN', otherLangTitle: '한국어판',
-    sameTopic: 'More on this topic', home: 'Home', feed: 'RSS', footerLine: 'Dev tips Yuho writes down wherever he gets stuck while building SYNK. Each post is one Markdown file.',
-    channels: 'Channels', site: 'SYNK', edit: 'Suggest an edit', notFound: 'Nothing lives at that address', notFoundLead: 'The link may have changed, or the post is not written yet.',
+    name: 'SYNK Tips', tagline: 'Dev tips Yuho collected while building SYNK', by: 'by yuhobuilds', author: 'Yuho',
+    nav: { start: 'Start here', topics: 'Topics', latest: 'Latest' },
+    heroEyebrow: 'Tips · by yuhobuilds', heroA: 'Dev tips written', heroB: 'right where I got stuck',
+    heroLead: 'Moments I got stuck using Claude and other AI tools on Windows, written down as they happened.',
+    heroLead2: 'Every post opens with the quick answer, then why it happens and how to stop it next time.',
+    findPlaceholder: 'Type the symptom as you saw it', findGo: 'Search', often: 'Common symptoms',
+    featured: 'Newest post', readGo: 'Read', coverSymptom: 'What you see',
+    startLead: 'Read these in order to get past the first walls people hit with AI tools.', startTotal: (n) => `About ${n} min in total`,
+    topicsTitle: 'Browse by topic', soon: 'Coming soon', latestTitle: 'Latest posts', seeAll: 'See all',
+    allTitle: 'All posts', allLead: (n) => `${n} post${n === 1 ? '' : 's'} so far, newest first.`,
+    topicLead: (name, n) => `${n} post${n === 1 ? '' : 's'} on ${name}.`,
+    bylineTitle: 'Yuho gets stuck first, then writes it down', bylineLead: 'Someone who knew nothing about code, building a company with AI. The same stories go up as videos too.',
+    search: 'Search', searchPlaceholder: 'Search by symptom or tool', noResults: 'No matching posts',
+    copy: 'Copy', toc: 'On this page', mtoc: 'Contents', readTime: (n) => `${n} min read`,
+    next: { start: (i, n) => `Start here · ${i} / ${n}`, topic: 'More on this topic', latest: 'Latest' },
+    otherLang: 'KR', thisLang: 'EN', otherLangTitle: '한국어판', home: 'Home', feed: 'RSS',
+    footerLine: 'Dev tips Yuho writes down at every spot where building SYNK got stuck. Each post is one Markdown file.',
+    site: 'SYNK', edit: 'Suggest an edit', notFound: 'Nothing lives at that address', notFoundLead: 'The link may have changed, or the post is not written yet.',
     levelLegend: { beginner: 'Follow along on day one', intermediate: 'You have used the tool a bit', advanced: 'Digs into how it works' },
-    menu: 'Menu', skip: 'Skip to content', postsIn: (t) => `Posts on ${t}`,
+    menu: 'Menu', skip: 'Skip to content',
     head: { answer: 'Quick answer', why: 'Why it happens', prevent: 'Stop it next time', takeaway: 'Take this with you', for: 'For', read: 'Reading time', min: (n) => `${n} min`, level: 'Level' },
   },
 };
@@ -79,6 +101,7 @@ const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').
 const attr = esc;
 const hash8 = (buf) => crypto.createHash('sha256').update(buf).digest('hex').slice(0, 8);
 const dotDate = (iso) => iso.replace(/-/g, '.');
+const pad2 = (n) => String(n).padStart(2, '0');
 const fail = (msg) => { console.error('✗ ' + msg); process.exit(1); };
 
 function slugify(text) {
@@ -116,8 +139,13 @@ function makeRenderer(rel, lang) {
       let id = slugify(plain);
       let n = 2; while (used.has(id)) id = `${slugify(plain)}-${n++}`;
       used.add(id);
-      if (depth === 2) toc.push({ id, text: plain });
-      return `<h${depth} id="${attr(id)}">${text}<a class="anchor" href="#${attr(id)}" aria-hidden="true" tabindex="-1">#</a></h${depth}>\n`;
+      const anchor = `<a class="anchor" href="#${attr(id)}" aria-hidden="true" tabindex="-1">#</a>`;
+      if (depth !== 2) return `<h${depth} id="${attr(id)}">${text}${anchor}</h${depth}>\n`;
+      // H2 = 글 틀의 절. 번호를 붙이고, 뒤에서 sectionize() 가 절마다 <section> 으로 묶는다.
+      const num = pad2(toc.length + 1);
+      toc.push({ id, text: plain, n: num });
+      const kind = SEC_KIND[plain.trim().toLowerCase()] || '';
+      return `\n<!--SEC ${kind}-->\n<div class="sec-h"><span class="n" aria-hidden="true">${num}</span><h2 id="${attr(id)}">${text}${anchor}</h2></div>\n`;
     },
     code({ text, lang: l }) {
       const language = (l || '').trim().split(/\s+/)[0];
@@ -145,14 +173,38 @@ function makeRenderer(rel, lang) {
   return { renderer, toc };
 }
 
+/* H2 표식(<!--SEC kind-->) 사이를 <section class="sec sec-kind"> 로 묶는다 */
+function sectionize(html) {
+  const parts = html.split(/\n?<!--SEC (\w*)-->\n/);
+  let outHtml = parts[0].trim() ? `<div class="sec sec-intro">\n${parts[0]}</div>\n` : '';
+  for (let i = 1; i < parts.length; i += 2) outHtml += `<section class="sec${parts[i] ? ' sec-' + parts[i] : ''}">${parts[i + 1]}</section>\n`;
+  return outHtml;
+}
+
 function renderMarkdown(md, rel, lang) {
   const { renderer, toc } = makeRenderer(rel, lang);
   const m = new Marked({ gfm: true, breaks: false, renderer });
-  const html = m.parse(md);
+  const html = sectionize(m.parse(md));
   return { html, toc };
 }
 
 const stripHtml = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+
+/* 표지: ```lang cover 로 고른 블록 → 증상 절의 첫 코드 블록 → 글의 첫 코드 블록 */
+function findCover(md) {
+  const tokens = new Marked({ gfm: true }).lexer(md);
+  let kind = '', first = null, inSymptom = null;
+  for (const tk of tokens) {
+    if (tk.type === 'heading' && tk.depth === 2) { kind = SEC_KIND[String(tk.text).trim().toLowerCase()] || ''; continue; }
+    if (tk.type !== 'code') continue;
+    const info = String(tk.lang || '').trim().split(/\s+/);
+    const c = { lang: info[0] || 'text', text: tk.text, symptom: kind === 'symptom' };
+    if (info.includes('cover')) return c;
+    if (kind === 'symptom' && !inSymptom) inSymptom = c;
+    if (!first) first = c;
+  }
+  return inSymptom || first;
+}
 
 /* ---------- 글 모으기 ---------- */
 function loadPosts() {
@@ -162,6 +214,7 @@ function loadPosts() {
     const m = file.match(/^(.+)\.(ko|en)\.md$/);
     if (!m) continue;
     const [, slug, lang] = m;
+    if (RESERVED_SLUGS.includes(slug)) fail(`${file}: slug "${slug}"는 사이트 경로로 쓴다 (${RESERVED_SLUGS.join(', ')} 말고)`);
     const raw = fs.readFileSync(path.join(POSTS, file), 'utf8');
     const { meta, body } = parseFrontMatter(raw, file);
     for (const k of ['title', 'date', 'level', 'topic', 'summary']) if (!meta[k]) fail(`${file}: 앞머리에 ${k}가 없다`);
@@ -176,29 +229,77 @@ function loadPosts() {
     const head = {};
     for (const k of ['hook', 'for', 'answer', 'answer_code', 'answer_lang', 'why', 'prevent', 'takeaway']) if (meta[k]) head[k] = meta[k];
     if (head.answer && !(head.why && head.prevent && head.takeaway)) fail(`${file}: answer 를 쓰면 why · prevent · takeaway 도 같이 쓴다`);
-    bySlug.get(slug)[lang] = { slug, lang, file, title: meta.title, date: meta.date, level, topic: meta.topic, tools, summary: meta.summary, start, body, head, draft: meta.draft === 'true' };
+    bySlug.get(slug)[lang] = {
+      slug, lang, file, title: meta.title, date: meta.date, level, topic: meta.topic, tools, summary: meta.summary, start, body, head,
+      short: meta.short || '', featured: meta.featured === 'true', draft: meta.draft === 'true',
+    };
   }
   const posts = [];
-  for (const [slug, langs] of bySlug) for (const lang of LANGS) if (langs[lang] && !langs[lang].draft) posts.push({ ...langs[lang], alt: LANGS.filter((l) => l !== lang && langs[l] && !langs[l].draft) });
+  for (const [, langs] of bySlug) for (const lang of LANGS) if (langs[lang] && !langs[lang].draft) posts.push({ ...langs[lang], alt: LANGS.filter((l) => l !== lang && langs[l] && !langs[l].draft) });
   if (!posts.length) fail('글이 하나도 없다 (posts/<slug>.ko.md)');
   return posts;
 }
 
-/* 글 정렬: 날짜 내림차순, 같은 날짜는 slug 바이트 순 — 로캘·OS 와 무관하게 같은 결과 */
-const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+/* 글마다 한 번: 본문 HTML · 차례 · 읽는 시간 · 표지 · 검색 글. 글 페이지는 늘 dist/<lang>/<slug>/ 라 rel 이 같다. */
+function preparePost(p) {
+  p.rendered = renderMarkdown(p.body, '../../', p.lang);
+  p.minutes = readMinutes(p.rendered.html);
+  p.cover = findCover(p.body);
+  const headText = ['hook', 'answer', 'answer_code', 'why', 'prevent', 'takeaway'].map((k) => p.head[k] || '').join(' ');
+  p.text = (headText + ' ' + stripHtml(p.rendered.html)).trim();
+  // short(짧은 이름)는 「많이 찾는 증상」 칩의 검색어가 된다 — 그 말로 찾으면 이 글이 나와야 한다(app.js score 와 같은 규칙)
+  if (p.short) {
+    const hay = [p.title, p.summary, TOPICS[p.topic][p.lang], LEVELS[p.level][p.lang], p.tools.join(' '), p.text.slice(0, 2000)].join(' \n ').toLowerCase();
+    const miss = p.short.toLowerCase().split(/\s+/).filter((x) => x && !hay.includes(x));
+    if (miss.length) fail(`${p.file}: short 「${p.short}」로 찾으면 이 글이 안 나온다 (글에 없는 낱말: ${miss.join(', ')})`);
+  }
+}
+
+/* 글 정렬은 로캘·OS 와 무관하게 같은 결과가 나와야 한다(localeCompare 금지) */
+const bySlugBytes = (a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+const startRank = (p) => (p.start > 0 ? p.start : 1e6);
+// RSS: 날짜 내림차순, 같은 날짜는 slug 바이트 순
+const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : bySlugBytes(a, b));
+// 화면: 날짜 내림차순, 같은 날짜는 「처음이면 여기부터」 순서 → slug
+const byNewest = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (startRank(a) - startRank(b)) || bySlugBytes(a, b));
+const startPathOf = (list) => list.filter((p) => p.start > 0).sort((a, b) => a.start - b.start || bySlugBytes(a, b));
 
 /* ---------- 조각(HTML 부품) ---------- */
 const levelBadge = (lang, level) => `<span class="lv lv-${level}" title="${attr(T[lang].levelLegend[level])}"><i aria-hidden="true"></i>${esc(LEVELS[level][lang])}</span>`;
-const topicChip = (lang, topic, rel) => `<a class="chip" href="${attr(rel + lang + '/topic/' + topic + '/')}">${esc(TOPICS[topic][lang] || topic)}</a>`;
-const timeTag = (date) => `<time class="mono" datetime="${attr(date)}">${esc(dotDate(date))}</time>`;
+const topicTag = (lang, topic) => `<span class="tag">${esc(TOPICS[topic][lang] || topic)}</span>`;
+const timeTag = (date) => `<time class="d" datetime="${attr(date)}">${esc(dotDate(date))}</time>`;
+const postHref = (p, rel) => `${rel}${p.lang}/${p.slug}/`;
+const searchIco = (size) => `<svg class="search-ico" viewBox="0 0 20 20" width="${size}" height="${size}" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+const logo = (lang, rel) => `<a class="logo" href="${rel}${lang}/" aria-label="${attr(T[lang].name)}"><span class="mark" aria-hidden="true">tip</span><b>SYNK</b><span>tips</span></a>`;
 
-function postRow(p, rel, { number } = {}) {
-  const lang = p.lang;
-  return `<li class="row"><a class="row-link" href="${attr(rel + lang + '/' + p.slug + '/')}">`
-    + (number ? `<span class="row-num mono">${String(number).padStart(2, '0')}</span>` : '')
-    + `<span class="row-body"><span class="row-meta">${levelBadge(lang, p.level)}<span class="chip chip-flat">${esc(TOPICS[p.topic][lang])}</span>${timeTag(p.date)}</span>`
-    + `<span class="row-title">${esc(p.title)}</span><span class="row-sum">${esc(p.summary)}</span></span>`
-    + `<span class="row-arr mono" aria-hidden="true">→</span></a></li>`;
+/* 표지(증상 화면): 첫 줄 몇 개만, 프롬프트(PS>, $)는 흐리게 */
+function coverHtml(p, { big = false } = {}) {
+  const c = p.cover, t = T[p.lang];
+  if (!c) return `<div class="cover-none" aria-hidden="true">${esc(TOPICS[p.topic][p.lang])}</div>`;
+  const name = LANG_NAME[c.lang.toLowerCase()] || TOPICS[p.topic][p.lang];
+  const label = c.symptom ? `${t.coverSymptom} · ${name}` : name;
+  const max = big ? 5 : 4; // 「…」 줄까지 친 줄 수 — 카드 표지 높이를 같게 둔다
+  const lines = c.text.replace(/\s+$/, '').split('\n');
+  const more = lines.length > max;
+  const shown = lines.slice(0, more ? max - 1 : max).map((l) => {
+    const m = l.match(/^(PS[^>\n]*>|\$|>)(\s.*)?$/);
+    return `<span class="ln">${m ? `<span class="p">${esc(m[1])}</span>${esc(m[2] || '')}` : (esc(l) || ' ')}</span>`;
+  });
+  if (more) shown.push('<span class="ln p">…</span>');
+  return `<div class="term${big ? ' term-big' : ''}" aria-hidden="true"><div class="term-bar"><i></i><i></i><i></i><span>${esc(label)}</span></div><pre>${shown.join('')}</pre></div>`;
+}
+
+function card(p, rel, { h = 'h3' } = {}) {
+  return `<a class="card" href="${attr(postHref(p, rel))}"><div class="cover">${coverHtml(p)}</div>`
+    + `<div class="body"><span class="meta">${levelBadge(p.lang, p.level)}${topicTag(p.lang, p.topic)}${timeTag(p.date)}</span>`
+    + `<${h} class="ttl">${esc(p.title)}</${h}><p>${esc(p.summary)}</p></div></a>`;
+}
+
+/* 주제 목록: 글이 있는 주제 먼저(topics.json 순서), 없는 주제는 「준비 중」으로 끝에 */
+function topicList(lang, mine) {
+  const t = T[lang];
+  const rows = Object.keys(TOPICS).map((k) => ({ k, name: TOPICS[k][lang], n: mine.filter((p) => p.topic === k).length }));
+  return [...rows.filter((r) => r.n), ...rows.filter((r) => !r.n)].map((r) => ({ ...r, soonLabel: t.soon }));
 }
 
 function layout({ lang, rel, title, description, pathFromRoot, alternates, body, assetVer, bodyClass = '', kind = 'page' }) {
@@ -210,6 +311,7 @@ function layout({ lang, rel, title, description, pathFromRoot, alternates, body,
   const other = LANGS.find((l) => l !== lang);
   const otherHref = alt[other] ? rel + alt[other] : rel + other + '/';
   const fullTitle = kind === 'home' ? `${t.name} — ${t.tagline}` : `${title} — ${t.name}`;
+  const home = kind === 'home' ? '' : `${rel}${lang}/`;
   return `<!DOCTYPE html>
 <html lang="${lang}" class="no-js">
 <head>
@@ -232,34 +334,31 @@ ${altLinks}${xDefault}
 </head>
 <body class="${attr(bodyClass)}" data-lang="${lang}" data-rel="${attr(rel)}">
 <a class="skip" href="#main">${esc(t.skip)}</a>
-<header class="bar" data-bar>
-<div class="bar-inner">
-<a class="bar-logo" href="${rel}${lang}/" aria-label="${attr(t.name)}"><b>SYNK</b><span>tips</span></a>
-<nav class="bar-nav" aria-label="${attr(t.menu)}"><a href="${rel}${lang}/#start">${esc(t.start)}</a><a href="${rel}${lang}/#topics">${esc(t.topics)}</a></nav>
-<div class="search" data-search>
+<header class="bar"><div class="bar-inner">
+${logo(lang, rel)}
+<nav class="nav" aria-label="${attr(t.menu)}"><a href="${home}#start">${esc(t.nav.start)}</a><a href="${home}#topics">${esc(t.nav.topics)}</a><a href="${home}#latest">${esc(t.nav.latest)}</a></nav>
+<div class="search bar-search" data-search>
 <label class="sr-only" for="q">${esc(t.search)}</label>
-<input id="q" type="search" autocomplete="off" placeholder="${attr(t.searchPlaceholder)}" data-index="${rel}${lang}/search.json" data-empty="${attr(t.noResults)}">
-<svg class="search-ico" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+${searchIco(16)}<input id="q" type="search" autocomplete="off" placeholder="${attr(t.searchPlaceholder)}" data-index="${rel}${lang}/search.json" data-empty="${attr(t.noResults)}"><kbd aria-hidden="true">/</kbd>
 <div class="search-panel" data-search-panel hidden></div>
 </div>
-<button class="bar-search" type="button" data-search-open aria-label="${attr(t.search)}"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-<div class="bar-lang"><a href="${rel}${lang}/" hreflang="${lang}" lang="${lang}" aria-current="true">${esc(t.thisLang)}</a><a href="${attr(otherHref)}" hreflang="${other}" lang="${other}" title="${attr(t.otherLangTitle)}">${esc(t.otherLang)}</a></div>
-</div>
-</header>
+<div class="lang"><a href="${rel}${lang}/" hreflang="${lang}" lang="${lang}" aria-current="true">${esc(t.thisLang)}</a><a href="${attr(otherHref)}" hreflang="${other}" lang="${other}" title="${attr(t.otherLangTitle)}">${esc(t.otherLang)}</a></div>
+<button class="icon-btn" type="button" data-search-open aria-expanded="false" aria-label="${attr(t.search)}">${searchIco(18)}</button>
+<a class="cta" href="${attr(CHANNELS[0].url)}" target="_blank" rel="noopener"><img src="${rel}${PHOTO}" alt="" width="28" height="28">${esc(t.by)}</a>
+</div></header>
 <main id="main" class="main">
 ${body}
 </main>
-<footer class="foot">
-<div class="wrap foot-grid">
-<div class="foot-brand"><a class="bar-logo foot-logo" href="${rel}${lang}/"><b>SYNK</b><span>tips</span></a><p>${esc(t.footerLine)}</p></div>
+<footer class="foot"><div class="wrap">
+<div class="foot-grid">
+<div class="foot-brand">${logo(lang, rel)}<p>${esc(t.footerLine)}</p></div>
 <div class="foot-col"><h2>${esc(t.by)}</h2><ul>${CHANNELS.map((c) => `<li><a href="${attr(c.url)}" target="_blank" rel="noopener">${esc(c.label)}</a></li>`).join('')}</ul></div>
 <div class="foot-col"><h2>${esc(t.site)}</h2><ul><li><a href="https://synk.im/" target="_blank" rel="noopener">synk.im</a></li><li><a href="${rel}${lang}/feed.xml">${esc(t.feed)}</a></li>${REPO_URL ? `<li><a href="${attr(REPO_URL)}" target="_blank" rel="noopener">GitHub</a></li>` : ''}<li><a href="${attr(otherHref)}" hreflang="${other}" lang="${other}">${esc(t.otherLangTitle)}</a></li></ul></div>
 </div>
-<div class="wrap foot-bottom"><span>© 2026 SYNK · ${esc(t.by)}</span><span class="mono">tips.synk.im</span></div>
-</footer>
+<div class="foot-bottom"><span>© 2026 SYNK · ${esc(t.by)}</span><span class="mono">tips.synk.im</span></div>
+</div></footer>
 <script src="${rel}assets/app.js?v=${assetVer.js}" defer></script>
-${beaconTag()}
-</body>
+${beaconTag()}</body>
 </html>
 `;
 }
@@ -268,75 +367,143 @@ ${beaconTag()}
 function homePage(lang, posts, rel, assetVer) {
   const t = T[lang];
   const mine = posts.filter((p) => p.lang === lang);
-  const startPath = mine.filter((p) => p.start > 0).sort((a, b) => a.start - b.start);
-  const recent = [...mine].sort(byDateDesc);
-  const topicCounts = Object.keys(TOPICS).map((k) => ({ k, n: mine.filter((p) => p.topic === k).length })).filter((x) => x.n > 0);
-  const body = `
-<section class="hero wrap">
-<p class="eyebrow"><span class="dot" aria-hidden="true"></span>TIPS · ${esc(t.by).toUpperCase()}</p>
-<h1 class="display"><span>${esc(t.heroA)}</span><span class="tone">${esc(t.heroB)}</span></h1>
-<p class="lead">${esc(t.heroLead)}</p>
-<p class="hero-channels">${CHANNELS.map((c) => `<a class="chip" href="${attr(c.url)}" target="_blank" rel="noopener">${esc(c.label)} ↗</a>`).join('')}</p>
+  const startPath = startPathOf(mine);
+  const newest = [...mine].sort(byNewest);
+  const featured = mine.find((p) => p.featured) || newest[0];
+  const latest = newest.filter((p) => p !== featured).slice(0, 4);
+  const chips = mine.filter((p) => p.short).sort((a, b) => ((a.start > 0) - (b.start > 0)) || (startRank(a) - startRank(b)) || byNewest(a, b)).slice(0, 3);
+  const topics = topicList(lang, mine);
+  const body = `<div class="wrap">
+<section class="hero">
+<div>
+<p class="eyebrow"><span class="dot" aria-hidden="true"></span>${esc(t.heroEyebrow)}</p>
+<h1><span>${esc(t.heroA)}</span><span class="tone">${esc(t.heroB)}</span></h1>
+<p class="lead">${esc(t.heroLead)} <span class="m-hide">${esc(t.heroLead2)}</span></p>
+<div class="find search" data-search data-search-main>
+${searchIco(20)}<label class="sr-only" for="q-hero">${esc(t.search)}</label>
+<input id="q-hero" type="search" autocomplete="off" placeholder="${attr(t.findPlaceholder)}" data-index="${rel}${lang}/search.json" data-empty="${attr(t.noResults)}">
+<button class="btn btn-dark" type="button" data-search-go>${esc(t.findGo)}</button>
+<div class="search-panel" data-search-panel hidden></div>
+</div>
+${chips.length ? `<p class="often"><span class="kicker">${esc(t.often)}</span>${chips.map((p) => `<a href="${attr(postHref(p, rel))}" data-q="${attr(p.short)}">${esc(p.short)}</a>`).join('')}</p>` : ''}
+</div>
+<div class="feature">
+<p class="label"><span class="kicker">${esc(t.featured)}</span><span class="meta">${timeTag(featured.date)}</span></p>
+${coverHtml(featured, { big: true })}
+<a class="feature-card" href="${attr(postHref(featured, rel))}"><span class="meta">${levelBadge(lang, featured.level)}${topicTag(lang, featured.topic)}</span><h2>${esc(featured.title)}</h2><p>${esc(featured.summary)}</p><span class="go">${esc(t.readGo)} <span class="arr" aria-hidden="true">→</span></span></a>
+</div>
 </section>
-${startPath.length ? `<section class="section wrap" id="start" aria-labelledby="start-title">
-<div class="sec-head"><p class="eyebrow"><span class="dot" aria-hidden="true"></span>01 / START</p><h2 class="h2" id="start-title">${esc(t.start)}</h2><p class="sec-lead">${esc(t.startLead)}</p></div>
-<ol class="rows rows-start">${startPath.map((p, i) => postRow(p, rel, { number: i + 1 })).join('')}</ol>
+${startPath.length ? `<section class="path" id="start" aria-labelledby="start-title">
+<div><p class="eyebrow"><span class="dot" aria-hidden="true"></span>Start here</p><h2 class="sec-title" id="start-title">${esc(t.nav.start)}</h2><p class="sec-lead">${esc(t.startLead)}</p><p class="meta">${esc(t.startTotal(startPath.reduce((s, p) => s + p.minutes, 0)))}</p></div>
+<ol class="steps">${startPath.map((p, i) => `<li><a class="step" href="${attr(postHref(p, rel))}"><span class="n" aria-hidden="true">${pad2(i + 1)}</span><span class="meta">${levelBadge(lang, p.level)}${topicTag(lang, p.topic)}</span><h3>${esc(p.title)}</h3><span class="time">${esc(t.readTime(p.minutes))}<span class="arr" aria-hidden="true">→</span></span></a></li>`).join('')}</ol>
 </section>` : ''}
-<section class="section wrap" id="recent" aria-labelledby="recent-title">
-<div class="sec-head"><p class="eyebrow"><span class="dot" aria-hidden="true"></span>02 / LATEST</p><h2 class="h2" id="recent-title">${esc(t.recent)}</h2></div>
-<ul class="rows">${recent.map((p) => postRow(p, rel)).join('')}</ul>
-</section>
-<section class="section wrap" id="topics" aria-labelledby="topics-title">
-<div class="sec-head"><p class="eyebrow"><span class="dot" aria-hidden="true"></span>03 / TOPICS</p><h2 class="h2" id="topics-title">${esc(t.topics)}</h2><p class="sec-lead">${esc(t.topicLead)}</p></div>
-<ul class="topic-grid">${topicCounts.map(({ k, n }) => `<li><a class="topic-card" href="${attr(rel + lang + '/topic/' + k + '/')}"><span class="topic-name">${esc(TOPICS[k][lang])}</span><span class="topic-count mono">${esc(t.posts(n))}</span><span class="row-arr mono" aria-hidden="true">→</span></a></li>`).join('')}</ul>
+<section class="browse">
+<div id="topics">
+<p class="eyebrow"><span class="dot" aria-hidden="true"></span>Topics</p>
+<h2 class="sec-title">${esc(t.topicsTitle)}</h2>
+<ul class="topics">${topics.map((r) => (r.n ? `<li><a href="${attr(rel + lang + '/topic/' + r.k + '/')}">${esc(r.name)}<span class="c">${r.n}</span></a></li>` : `<li><span class="soon">${esc(r.name)}<span class="c">${esc(r.soonLabel)}</span></span></li>`)).join('')}</ul>
 <ul class="legend">${Object.keys(LEVELS).map((l) => `<li>${levelBadge(lang, l)}<span>${esc(t.levelLegend[l])}</span></li>`).join('')}</ul>
-</section>`;
+</div>
+<div id="latest">
+<div class="latest-head"><div><p class="eyebrow"><span class="dot" aria-hidden="true"></span>Latest</p><h2 class="sec-title">${esc(t.latestTitle)}</h2></div><a href="${rel}${lang}/posts/">${esc(t.seeAll)} <span class="arr" aria-hidden="true">→</span></a></div>
+<div class="cards">${latest.map((p) => card(p, rel)).join('')}</div>
+</div>
+</section>
+<section class="byline" aria-labelledby="by-title">
+<img src="${rel}${PHOTO}" alt="${attr(t.author)}" width="72" height="72" loading="lazy">
+<div><h2 id="by-title">${esc(t.bylineTitle)}</h2><p>${esc(t.bylineLead)}</p></div>
+<div class="ch">${CHANNELS.map((c) => `<a class="btn btn-line" href="${attr(c.url)}" target="_blank" rel="noopener">${esc(c.label)} <span class="arr" aria-hidden="true">↗</span></a>`).join('')}</div>
+</section>
+</div>`;
   return layout({ lang, rel, title: t.name, description: t.tagline, pathFromRoot: `${lang}/`, alternates: Object.fromEntries(LANGS.map((l) => [l, `${l}/`])), body, assetVer, bodyClass: 'home', kind: 'home' });
+}
+
+/* 목록 화면: 주제 하나 · 전체 글 */
+function listPage(lang, posts, rel, assetVer, { list, eyebrow, title, lead, pathFromRoot, current, description }) {
+  const t = T[lang];
+  const mine = posts.filter((p) => p.lang === lang);
+  const topics = topicList(lang, mine);
+  const body = `<div class="wrap">
+<section class="list-head"><p class="eyebrow"><span class="dot" aria-hidden="true"></span>${esc(eyebrow)}</p><h1>${esc(title)}</h1><p class="sec-lead">${esc(lead)}</p></section>
+<section class="list-body">
+<div class="cards cards-3">${list.map((p) => card(p, rel, { h: 'h2' })).join('')}</div>
+<nav class="more-topics" aria-label="${attr(t.topicsTitle)}"><p class="kicker">${esc(t.topicsTitle)}</p><ul>
+<li><a href="${rel}${lang}/posts/"${current === '*' ? ' aria-current="page"' : ''}>${esc(t.allTitle)}<span class="c">${mine.length}</span></a></li>
+${topics.map((r) => (r.n ? `<li><a href="${attr(rel + lang + '/topic/' + r.k + '/')}"${current === r.k ? ' aria-current="page"' : ''}>${esc(r.name)}<span class="c">${r.n}</span></a></li>` : `<li><span class="soon">${esc(r.name)}<span class="c">${esc(r.soonLabel)}</span></span></li>`)).join('\n')}
+</ul></nav>
+</section>
+</div>`;
+  return layout({ lang, rel, title, description, pathFromRoot: pathFromRoot(lang), alternates: Object.fromEntries(LANGS.map((l) => [l, pathFromRoot(l)])), body, assetVer, bodyClass: 'list' });
 }
 
 function topicPage(lang, topic, posts, rel, assetVer) {
   const t = T[lang];
-  const mine = posts.filter((p) => p.lang === lang && p.topic === topic).sort(byDateDesc);
+  const list = posts.filter((p) => p.lang === lang && p.topic === topic).sort(byNewest);
   const name = TOPICS[topic][lang];
-  const body = `
-<section class="hero hero-small wrap">
-<p class="eyebrow"><span class="dot" aria-hidden="true"></span>${esc(t.topics).toUpperCase()} / ${esc(topic).toUpperCase()}</p>
-<h1 class="display">${esc(name)}</h1>
-<p class="lead">${esc(t.postsIn(name))} · ${esc(t.posts(mine.length))}</p>
-</section>
-<section class="section wrap"><ul class="rows">${mine.map((p) => postRow(p, rel)).join('')}</ul></section>`;
-  return layout({ lang, rel, title: name, description: `${t.postsIn(name)} — ${t.tagline}`, pathFromRoot: `${lang}/topic/${topic}/`, alternates: Object.fromEntries(LANGS.map((l) => [l, `${l}/topic/${topic}/`])), body, assetVer, bodyClass: 'topic' });
+  return listPage(lang, posts, rel, assetVer, { list, eyebrow: 'Topics', title: name, lead: t.topicLead(name, list.length), pathFromRoot: (l) => `${l}/topic/${topic}/`, current: topic, description: `${t.topicLead(name, list.length)} — ${t.tagline}` });
+}
+
+function allPage(lang, posts, rel, assetVer) {
+  const t = T[lang];
+  const list = posts.filter((p) => p.lang === lang).sort(byNewest);
+  return listPage(lang, posts, rel, assetVer, { list, eyebrow: 'Posts', title: t.allTitle, lead: t.allLead(list.length), pathFromRoot: (l) => `${l}/posts/`, current: '*', description: `${t.allTitle} — ${t.tagline}` });
+}
+
+/* 다음 글: 「처음이면 여기부터」 다음 편 → 같은 주제(길잡이 밖의 글 먼저) → 최근 글 */
+function nextPost(p, mine) {
+  const t = T[p.lang];
+  const startPath = startPathOf(mine);
+  const si = startPath.findIndex((x) => x.slug === p.slug);
+  if (si >= 0 && si < startPath.length - 1) return { post: startPath[si + 1], label: t.next.start(pad2(si + 2), pad2(startPath.length)) };
+  const others = mine.filter((x) => x.slug !== p.slug).sort(byNewest);
+  const same = others.filter((x) => x.topic === p.topic);
+  const pick = same.find((x) => !x.start) || same[0];
+  if (pick) return { post: pick, label: t.next.topic };
+  return others[0] ? { post: others[0], label: t.next.latest } : null;
 }
 
 function postPage(p, posts, rel, assetVer) {
   const lang = p.lang, t = T[lang];
-  const { html, toc } = renderMarkdown(p.body, rel, lang);
-  const same = posts.filter((x) => x.lang === lang && x.topic === p.topic && x.slug !== p.slug).sort(byDateDesc).slice(0, 4);
+  const { html, toc } = p.rendered;
+  const mine = posts.filter((x) => x.lang === lang);
+  const startPath = startPathOf(mine);
+  const topics = topicList(lang, mine);
+  const next = nextPost(p, mine);
   const alternates = { [lang]: `${lang}/${p.slug}/` };
   for (const l of p.alt) alternates[l] = `${l}/${p.slug}/`;
-  const body = `
-<article class="post wrap">
-<header class="post-head">
-<p class="post-meta">${levelBadge(lang, p.level)}${topicChip(lang, p.topic, rel)}${timeTag(p.date)}</p>
-<h1 class="post-title">${esc(p.title)}</h1>
-<p class="lead post-sum">${p.head.hook ? inlineMd(p.head.hook) : esc(p.summary)}</p>
-${headBox(p, html)}
-<p class="byline"><span class="mono">${esc(t.by).toUpperCase()}</span>${CHANNELS.map((c) => `<a href="${attr(c.url)}" target="_blank" rel="noopener">${esc(c.label)}</a>`).join('<span class="sep" aria-hidden="true">·</span>')}</p>
-${p.tools.length ? `<p class="tools"><span class="tools-label mono">${esc(t.tools).toUpperCase()}</span>${p.tools.map((x) => `<span class="chip chip-flat">${esc(x)}</span>`).join('')}</p>` : ''}
-${toc.length ? `<nav class="toc" aria-label="${attr(t.toc)}"><span class="toc-label mono">${esc(t.toc).toUpperCase()}</span><ol>${toc.map((h) => `<li><a href="#${attr(h.id)}">${esc(h.text)}</a></li>`).join('')}</ol></nav>` : ''}
-</header>
+  const altLinks = p.alt.map((l) => `<a href="${attr(rel + l + '/' + p.slug + '/')}" hreflang="${l}" lang="${l}">${esc(t.otherLangTitle)} <span class="arr" aria-hidden="true">→</span></a>`).join('');
+  const editLink = REPO_URL ? `<a href="${attr(REPO_URL + '/edit/main/posts/' + p.file)}" target="_blank" rel="noopener">${esc(t.edit)} <span class="arr" aria-hidden="true">↗</span></a>` : '';
+  const tocItems = toc.map((h) => `<li><a href="#${attr(h.id)}"><span class="n">${h.n}</span><span>${esc(h.text)}</span></a></li>`).join('');
+  const mtoc = toc.length ? `<div class="mtoc" data-mtoc>
+<button class="mtoc-btn" type="button" aria-expanded="false" aria-controls="mtoc-list"><span class="mtoc-cur"><span class="n" data-mtoc-n>${toc[0].n}</span><span data-mtoc-label>${esc(toc[0].text)}</span></span><span class="mtoc-prog" aria-hidden="true"><i data-mtoc-prog></i></span><span class="mtoc-more">${esc(t.mtoc)} <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+<ol class="mtoc-list" id="mtoc-list" hidden>${tocItems}</ol>
+</div>` : '';
+  const body = `<div class="wrap">
+${mtoc}
+<div class="doc">
+<aside class="side" aria-label="${attr(t.nav.start + ' · ' + t.nav.topics)}">
+${startPath.length ? `<p class="kicker">${esc(t.nav.start)}</p><ol>${startPath.map((x, i) => `<li><a href="${attr(postHref(x, rel))}"${x.slug === p.slug ? ' class="on" aria-current="page"' : ''}><span class="n">${pad2(i + 1)}</span><span>${esc(x.short || x.title)}</span></a></li>`).join('')}</ol>` : ''}
+<p class="kicker">${esc(t.nav.topics)}</p><ul>${topics.map((r) => (r.n ? `<li><a href="${attr(rel + lang + '/topic/' + r.k + '/')}"${r.k === p.topic ? ' class="on"' : ''}><span>${esc(r.name)}</span><span class="c">${r.n}</span></a></li>` : `<li><span class="soon"><span>${esc(r.name)}</span><span class="c">${esc(r.soonLabel)}</span></span></li>`)).join('')}</ul>
+</aside>
+<article class="post">
+<p class="crumb"><a href="${rel}${lang}/">${esc(t.home)}</a><span aria-hidden="true">›</span><a href="${attr(rel + lang + '/topic/' + p.topic + '/')}"><b>${esc(TOPICS[p.topic][lang])}</b></a></p>
+<h1>${esc(p.title)}</h1>
+<p class="sum">${p.head.hook ? inlineMd(p.head.hook) : esc(p.summary)}</p>
+${headBox(p)}
+<p class="author"><img src="${rel}${PHOTO}" alt="" width="32" height="32"><b>${esc(t.author)}</b><a class="by" href="${attr(CHANNELS[0].url)}" target="_blank" rel="noopener">${esc(t.by)}</a><span class="sep" aria-hidden="true">·</span>${timeTag(p.date)}${p.head.answer ? '' : `<span class="sep" aria-hidden="true">·</span><span>${esc(t.readTime(p.minutes))}</span>${levelBadge(lang, p.level)}`}</p>
 <div class="prose">
-${html}
+${html}</div>
+${next ? `<a class="next" href="${attr(postHref(next.post, rel))}"><div><p class="k">${esc(next.label)}</p><p class="t">${esc(next.post.title)}</p></div><span class="go" aria-hidden="true">→</span></a>` : ''}
+<p class="post-links">${p.tools.map((x) => `<span class="tag">${esc(x)}</span>`).join('')}${altLinks}${editLink}</p>
+</article>
+<aside class="toc" data-toc aria-label="${attr(t.toc)}">
+${toc.length ? `<p class="kicker">${esc(t.toc)}</p><ol>${tocItems}</ol>` : ''}
+${p.tools.length ? `<div class="tools">${p.tools.map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div>` : ''}
+<div class="links">${altLinks}${editLink}</div>
+</aside>
 </div>
-<footer class="post-foot">
-<p class="byline"><span class="mono">${esc(t.by).toUpperCase()}</span>${CHANNELS.map((c) => `<a href="${attr(c.url)}" target="_blank" rel="noopener">${esc(c.label)}</a>`).join('<span class="sep" aria-hidden="true">·</span>')}${REPO_URL ? `<span class="sep" aria-hidden="true">·</span><a href="${attr(REPO_URL + '/edit/main/posts/' + p.file)}" target="_blank" rel="noopener">${esc(t.edit)}</a>` : ''}</p>
-${p.alt.length ? `<p class="alt-lang">${p.alt.map((l) => `<a class="btn btn-line" href="${attr(rel + l + '/' + p.slug + '/')}" hreflang="${l}" lang="${l}">${esc(T[lang].otherLangTitle)} <span class="arr" aria-hidden="true">→</span></a>`).join('')}</p>` : ''}
-${same.length ? `<section class="same" aria-labelledby="same-title"><h2 class="h3" id="same-title">${esc(t.sameTopic)}</h2><ul class="rows">${same.map((x) => postRow(x, rel)).join('')}</ul></section>` : ''}
-</footer>
-</article>`;
-  const page = layout({ lang, rel, title: p.title, description: p.summary, pathFromRoot: `${lang}/${p.slug}/`, alternates, body, assetVer, bodyClass: 'post-page', kind: 'post' });
-  const headText = ['hook', 'answer', 'answer_code', 'why', 'prevent', 'takeaway'].map((k) => p.head[k] || '').join(' ');
-  return { page, text: (headText + ' ' + stripHtml(html)).trim() };
+</div>`;
+  return layout({ lang, rel, title: p.title, description: p.summary, pathFromRoot: `${lang}/${p.slug}/`, alternates, body, assetVer, bodyClass: 'post-page', kind: 'post' });
 }
 
 /* 글 머리 상자: 바로 답 · 왜 · 다음부터 막기 · 가져갈 것 + 이런 분께 · 읽는 시간 · 난이도 */
@@ -347,7 +514,7 @@ function readMinutes(html) {
   const words = text.replace(/[가-힣]/g, ' ').split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(hangul / 500 + words / 220)); // 한글 분당 500자, 영어 분당 220낱말 남짓
 }
-function headBox(p, html) {
+function headBox(p) {
   const h = p.head;
   if (!h.answer) return '';
   const t = T[p.lang].head;
@@ -364,7 +531,7 @@ ${row('takeaway', t.takeaway)}
 </div>
 <dl class="head-side">
 ${h.for ? `<div><dt>${esc(t.for)}</dt><dd>${inlineMd(h.for)}</dd></div>` : ''}
-<div><dt>${esc(t.read)}</dt><dd>${esc(t.min(readMinutes(html)))}</dd></div>
+<div><dt>${esc(t.read)}</dt><dd>${esc(t.min(p.minutes))}</dd></div>
 <div><dt>${esc(t.level)}</dt><dd>${levelBadge(p.lang, p.level)}</dd></div>
 </dl>
 </section>`;
@@ -379,7 +546,7 @@ function rootRedirect() {
 `;
 }
 
-function notFoundPage(assetVer) {
+function notFoundPage() {
   const t = T.ko, e = T.en;
   // GitHub Pages 는 뿌리의 404.html 을 어느 깊이의 없는 주소에나 돌려주므로 상대 경로를 못 쓴다.
   // 그래서 이 페이지만 절대 경로를 쓰고, *.github.io/<저장소>/ 기본 주소에서는 첫 칸을 앞에 붙인다(스타일은 인라인).
@@ -423,6 +590,7 @@ function copyDir(src, dst) {
 
 function build() {
   const posts = loadPosts();
+  for (const p of posts) preparePost(p);
   fs.rmSync(DIST, { recursive: true, force: true });
   fs.mkdirSync(DIST, { recursive: true });
 
@@ -440,16 +608,17 @@ function build() {
 
   const urls = [];
   out('index.html', rootRedirect());
-  out('404.html', notFoundPage(assetVer));
+  out('404.html', notFoundPage());
   for (const lang of LANGS) {
     out(`${lang}/index.html`, homePage(lang, posts, '../', assetVer));
     urls.push(`${lang}/`);
+    out(`${lang}/posts/index.html`, allPage(lang, posts, '../../', assetVer));
+    urls.push(`${lang}/posts/`);
     const index = [];
     for (const p of posts.filter((x) => x.lang === lang)) {
-      const { page, text } = postPage(p, posts, '../../', assetVer);
-      out(`${lang}/${p.slug}/index.html`, page);
+      out(`${lang}/${p.slug}/index.html`, postPage(p, posts, '../../', assetVer));
       urls.push(`${lang}/${p.slug}/`);
-      index.push({ u: `${p.slug}/`, t: p.title, s: p.summary, l: LEVELS[p.level][lang], lv: p.level, p: TOPICS[p.topic][lang], k: p.tools, d: p.date, b: text.slice(0, 2000) });
+      index.push({ u: `${p.slug}/`, t: p.title, s: p.summary, l: LEVELS[p.level][lang], lv: p.level, p: TOPICS[p.topic][lang], k: p.tools, d: p.date, b: p.text.slice(0, 2000) });
     }
     for (const topic of Object.keys(TOPICS)) {
       if (!posts.some((x) => x.lang === lang && x.topic === topic)) continue;

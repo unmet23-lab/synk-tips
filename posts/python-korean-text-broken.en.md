@@ -5,6 +5,7 @@ level: beginner
 topic: windows
 tools: Windows 11, Python 3, PowerShell
 summary: Python output turns Korean (or other non-English) text into garbage like "ȫ���� 3��", or stops with UnicodeDecodeError / UnicodeEncodeError from a 'cp949', 'cp1252' or 'charmap' codec.
+short: Python garbles text
 start: 3
 hook: If a Python script your AI wrote prints garbage instead of Korean (or accented) text, or stops with `codec can't decode`, this post is for you.
 for: Anyone running AI-written Python scripts on Windows

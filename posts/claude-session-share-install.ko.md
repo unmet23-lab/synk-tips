@@ -37,7 +37,7 @@ winget install OpenJS.NodeJS.LTS
 
 공개 저장소: [unmet23-lab/claude-session-share](https://github.com/unmet23-lab/claude-session-share)
 
-```powershell
+```powershell cover
 irm https://raw.githubusercontent.com/unmet23-lab/claude-session-share/main/install.ps1 | iex
 ```
 

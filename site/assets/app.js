@@ -37,9 +37,17 @@
   var lang = document.documentElement.lang || 'ko';
   var index = null, loading = null;
 
+  // 받은 색인은 쪽을 떠날 때까지 쓰고, 받는 중이면 두 검색 칸이 그 요청 하나를 같이 기다린다.
+  // 못 받았으면(회선·HTTP 오류·목록이 아닌 응답) 기억하지 않는다 — 다음 입력·포커스·찾기가 새로 받는다.
   function load(url) {
     if (index) return Promise.resolve(index);
-    if (!loading) loading = fetch(url).then(function (r) { return r.json(); }).then(function (j) { index = j; return j; });
+    if (!loading) loading = fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('search index HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (!Array.isArray(j)) throw new Error('search index is not a list');
+      index = j; return j;
+    }).catch(function (e) { loading = null; throw e; });
     return loading;
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -108,7 +116,8 @@
     api.render = render;
     var timer = null;
     input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { render(input.value); }, 120); });
-    input.addEventListener('focus', function () { load(input.getAttribute('data-index')); if (input.value.trim()) render(input.value); });
+    // 포커스는 미리 받아 두기만 한다 — 실패하면 검색할 때 render 가 다시 받는다
+    input.addEventListener('focus', function () { load(input.getAttribute('data-index')).catch(function () {}); if (input.value.trim()) render(input.value); });
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { input.value = ''; panel.hidden = true; input.blur(); if (closeMobileSearch) closeMobileSearch(); }
       if (e.key === 'ArrowDown') { var first = panel.querySelector('a'); if (first) { e.preventDefault(); first.focus(); } }
